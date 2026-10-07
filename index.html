@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0">
+
+<meta name="theme-color" content="#f5f5f5">
+
+<title>Scanner Packing</title>
+
+<style>
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 14px 12px 30px;
+  text-align: center;
+  background: #f5f5f5;
+  color: #222;
+}
+
+h1 {
+  font-size: 25px;
+  margin: 4px 0 15px;
+  line-height: 1.2;
+}
+
+/* =====================================================
+   KAMERA
+   ===================================================== */
+
+#reader {
+  width: 90vw;
+  max-width: 500px;
+  margin: 20px auto 0;
+  background: #000;
+  border-radius: 15px;
+  overflow: hidden;
+}
+
+/* =====================================================
+   HASIL
+   ===================================================== */
+
+#hasil {
+  width: min(92vw, 600px);
+  margin: 16px auto 0;
+  padding: 20px 15px;
+  background: white;
+  border-radius: 16px;
+  font-size: 22px;
+  font-weight: bold;
+  line-height: 1.4;
+  white-space: pre-line;
+  word-break: break-word;
+  box-shadow: 0 2px 10px rgba(0,0,0,.08);
+}
+
+/* =====================================================
+   GAMBAR DESAIN
+   ===================================================== */
+
+#gambarDesain {
+  display: none;
+  width: min(92vw, 600px);
+  margin: 16px auto 0;
+  padding: 14px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.08);
+}
+
+.judulGambar {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+#previewDesain {
+  display: block;
+  width: 100%;
+  max-height: 500px;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
+.loading {
+  font-size: 20px;
+  color: #555;
+}
+
+/* =====================================================
+   HP
+   ===================================================== */
+
+@media (max-width: 480px) {
+
+  body {
+    padding-top: 10px;
+  }
+
+  h1 {
+    font-size: 22px;
+    margin-bottom: 12px;
+  }
+
+  #reader {
+    width: 90vw;
+    max-width: 380px;
+  }
+
+  #hasil {
+    font-size: 20px;
+    padding: 17px 13px;
+  }
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>📷 SCAN RESI PESANAN</h1>
+
+<!-- =====================================================
+     KAMERA
+     ===================================================== -->
+
+<div id="reader"></div>
+
+
+<!-- =====================================================
+     HASIL
+     ===================================================== -->
+
+<div id="hasil">
+
+  <span class="loading">
+    📷 Kamera sedang dibuka...
+    <br><br>
+    Arahkan kamera ke barcode pesanan.
+  </span>
+
+</div>
+
+
+<!-- =====================================================
+     GAMBAR DESAIN
+     ===================================================== -->
+
+<div id="gambarDesain">
+
+  <div class="judulGambar">
+    🖼️ DESAIN FINAL
+  </div>
+
+  <img
+    id="previewDesain"
+    src=""
+    alt="Desain Final"
+  >
+
+</div>
+
+
+<!-- =====================================================
+     LIBRARY SCANNER
+     ===================================================== -->
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+
+<script>
+
+/* =====================================================
+   URL WEB APP APPS SCRIPT
+   ===================================================== */
+
+const API_URL =
+  "https://script.google.com/macros/s/AKfycbxJyQtm_fFrtPBqSmBkPf30eIsk2NKFtfC6mZcWwiJ72WPJ0a49XKQo0IMU0WaREtGn/exec";
+
+
+/* =====================================================
+   VARIABEL
+   ===================================================== */
+
+let scanner = null;
+
+let nomorPesanan = "";
+
+let sedangMemproses = false;
+
+
+/* =====================================================
+   TAMPILKAN GAMBAR
+   ===================================================== */
+
+function tampilkanGambarDesain(url) {
+
+  const kotak =
+    document.getElementById("gambarDesain");
+
+  const gambar =
+    document.getElementById("previewDesain");
+
+
+  if (!url) {
+
+    kotak.style.display = "none";
+
+    gambar.src = "";
+
+    return;
+
+  }
+
+
+  gambar.src = url;
+
+  kotak.style.display = "block";
+
+}
+
+
+/* =====================================================
+   PAUSE SCANNER
+   ===================================================== */
+
+function pauseScanner() {
+
+  if (!scanner) return;
+
+  try {
+
+    scanner.pause(true);
+
+  } catch (error) {
+
+    console.log(
+      "Gagal pause scanner:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =====================================================
+   RESUME SCANNER
+   ===================================================== */
+
+function resumeScanner() {
+
+  if (!scanner) return;
+
+  try {
+
+    scanner.resume();
+
+  } catch (error) {
+
+    console.log(
+      "Gagal resume scanner:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =====================================================
+   MULAI SCANNER
+   ===================================================== */
+
+function mulaiScanner() {
+
+  if (scanner) return;
+
+
+  scanner =
+    new Html5Qrcode(
+      "reader",
+      {
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.CODE_128
+        ]
+      }
+    );
+
+
+  scanner.start(
+
+    {
+      facingMode: "environment"
+    },
+
+
+    {
+      fps: 15,
+
+      qrbox: function(
+        viewfinderWidth,
+        viewfinderHeight
+      ) {
+
+        const width =
+          Math.min(
+            Math.floor(viewfinderWidth * 0.85),
+            350
+          );
+
+        const height = 100;
+
+        return {
+          width: width,
+          height: height
+        };
+
+      }
+
+    },
+
+
+    /* =================================================
+       BARCODE BERHASIL
+       ================================================= */
+
+    function(decodedText) {
+
+
+      /*
+       * Jika masih memproses barcode sebelumnya,
+       * abaikan hasil scan baru.
+       */
+
+      if (sedangMemproses) return;
+
+
+      /* ===============================================
+         NORMALISASI BARCODE
+         =============================================== */
+
+      nomorPesanan =
+        decodedText
+          .trim()
+          .replace(/^\]C1/, "");
+
+
+      if (!nomorPesanan) return;
+
+
+      /* ===============================================
+         KUNCI PROSES
+         =============================================== */
+
+      sedangMemproses = true;
+
+
+      /*
+       * PAUSE KAMERA SEGERA
+       *
+       * Ini penting agar barcode yang sama tidak
+       * terbaca berkali-kali ketika server sedang
+       * memproses.
+       */
+
+      pauseScanner();
+
+
+      /* ===============================================
+         HAPUS GAMBAR LAMA
+         =============================================== */
+
+      tampilkanGambarDesain("");
+
+
+      /* ===============================================
+         TAMPILKAN STATUS
+         =============================================== */
+
+      document.getElementById("hasil").innerHTML =
+
+        "🔍 <b>MENGECEK NOMOR PESANAN...</b>" +
+
+        "<br><br>" +
+
+        nomorPesanan;
+
+
+      /* ===============================================
+         CEK KE APPS SCRIPT
+         =============================================== */
+
+      cekPesanan(nomorPesanan);
+
+    },
+
+
+    /* =================================================
+       ERROR SCAN SEMENTARA
+       ================================================= */
+
+    function(errorMessage) {
+
+      /*
+       * Barcode belum terbaca adalah kondisi normal.
+       * Tidak perlu menampilkan error.
+       */
+
+    }
+
+  )
+
+
+  /* ===================================================
+     SCANNER BERHASIL DIMULAI
+     =================================================== */
+
+  .then(function() {
+
+    document.getElementById("hasil").innerHTML =
+
+      "📷 <b>SIAP SCAN</b>" +
+
+      "<br><br>" +
+
+      "Arahkan kamera ke barcode pesanan.";
+
+  })
+
+
+  /* ===================================================
+     KAMERA ERROR
+     =================================================== */
+
+  .catch(function(error) {
+
+    console.log(
+      "KAMERA ERROR:",
+      error
+    );
+
+
+    document.getElementById("hasil").innerHTML =
+
+      "❌ <b>KAMERA TIDAK BISA DIBUKA</b>" +
+
+      "<br><br>" +
+
+      "Pastikan izin kamera browser sudah diizinkan.";
+
+
+    scanner = null;
+
+  });
+
+}
+
+
+/* =====================================================
+   CEK PESANAN
+   ===================================================== */
+
+function cekPesanan(nomor) {
+
+
+  const callbackName =
+    "hasilCek_" +
+    Date.now() +
+    "_" +
+    Math.floor(Math.random() * 1000);
+
+
+  let selesaiRequest = false;
+
+
+  /* ===================================================
+     FUNGSI SELESAI REQUEST
+     =================================================== */
+
+  function selesaikanRequest() {
+
+    sedangMemproses = false;
+
+    resumeScanner();
+
+  }
+
+
+  /* ===================================================
+     TIMEOUT 10 DETIK
+     =================================================== */
+
+  const timeoutRequest =
+
+    setTimeout(function() {
+
+
+      if (selesaiRequest) return;
+
+
+      selesaiRequest = true;
+
+
+      if (window[callbackName]) {
+
+        delete window[callbackName];
+
+      }
+
+
+      tampilkanPesan(
+
+        "❌ REQUEST TERLALU LAMA",
+
+        "Sistem tidak merespons dalam 10 detik.\n\n" +
+
+        "Coba scan lagi."
+
+      );
+
+
+    }, 10000);
+
+
+  /* ===================================================
+     CALLBACK JSONP
+     =================================================== */
+
+  window[callbackName] =
+
+    function(data) {
+
+
+      if (selesaiRequest) return;
+
+
+      selesaiRequest = true;
+
+
+      clearTimeout(timeoutRequest);
+
+
+      try {
+
+
+        /* =============================================
+           ERROR
+           ============================================= */
+
+        if (
+          !data ||
+          !data.success
+        ) {
+
+
+          tampilkanPesan(
+
+            "❌ TERJADI KESALAHAN",
+
+            data && data.message
+
+              ? data.message
+
+              : "Tidak dapat mengecek pesanan."
+
+          );
+
+
+          return;
+
+        }
+
+
+        /* =============================================
+           TIDAK DITEMUKAN
+           ============================================= */
+
+        if (!data.ditemukan) {
+
+
+          tampilkanPesan(
+
+            "🔴 NOMOR TIDAK DITEMUKAN",
+
+            "Nomor pesanan tidak ditemukan di PROSES CETAK maupun PACKING.\n\n" +
+
+            "Nomor Pesanan: " +
+
+            nomor
+
+          );
+
+
+          return;
+
+        }
+
+
+        /* =============================================
+           STATUS
+           ============================================= */
+
+        const status =
+
+          (data.status || "")
+
+            .toString()
+
+            .trim()
+
+            .toUpperCase();
+
+
+        /* =============================================
+           TAMPILKAN GAMBAR
+           ============================================= */
+
+        tampilkanGambarDesain(
+
+          data.gambar || ""
+
+        );
+
+
+        /* =============================================
+           PACKING
+           ============================================= */
+
+        if (
+          data.sumber === "PACKING"
+        ) {
+
+
+          if (
+            status === "SIAP KIRIM"
+          ) {
+
+
+            tampilkanPesan(
+
+              "🟢 SIAP KIRIM",
+
+              "Pesanan sudah selesai diproses.\n\n" +
+
+              "Nomor Pesanan: " +
+
+              nomor
+
+            );
+
+
+          }
+
+
+          else {
+
+
+            tampilkanPesan(
+
+              "🟢 PESANAN DITEMUKAN",
+
+              "Status: " +
+
+              status +
+
+              "\n\n" +
+
+              "Nomor Pesanan: " +
+
+              nomor
+
+            );
+
+          }
+
+
+          return;
+
+        }
+
+
+        /* =============================================
+           PROSES CETAK
+           ============================================= */
+
+        if (
+          data.sumber === "PROSES CETAK"
+        ) {
+
+
+          tampilkanPesan(
+
+            "🔵 " + status,
+
+            "Pesanan ditemukan di PROSES CETAK.\n\n" +
+
+            "Nomor Pesanan: " +
+
+            nomor
+
+          );
+
+
+          return;
+
+        }
+
+
+        /* =============================================
+           STATUS LAIN
+           ============================================= */
+
+        tampilkanPesan(
+
+          "ℹ️ STATUS PESANAN",
+
+          "Nomor Pesanan: " +
+
+          nomor +
+
+          "\n\nStatus: " +
+
+          status
+
+        );
+
+      }
+
+
+      finally {
+
+        delete window[callbackName];
+
+      }
+
+    };
+
+
+  /* ===================================================
+     JSONP REQUEST
+     =================================================== */
+
+  const script =
+    document.createElement("script");
+
+
+  script.src =
+
+    API_URL +
+
+    "?action=check" +
+
+    "&nomor=" +
+
+    encodeURIComponent(nomor) +
+
+    "&callback=" +
+
+    callbackName +
+
+    "&t=" +
+
+    Date.now();
+
+
+  /* ===================================================
+     ERROR REQUEST
+     =================================================== */
+
+  script.onerror = function() {
+
+
+    if (selesaiRequest) return;
+
+
+    selesaiRequest = true;
+
+
+    clearTimeout(timeoutRequest);
+
+
+    tampilkanPesan(
+
+      "❌ GAGAL TERHUBUNG",
+
+      "Tidak dapat menghubungi sistem."
+
+    );
+
+
+    delete window[callbackName];
+
+  };
+
+
+  document.body.appendChild(script);
+
+
+  /*
+   * Hapus tag script JSONP setelah beberapa saat.
+   * Callback tetap berada di window sampai selesai.
+   */
+
+  setTimeout(function() {
+
+    if (
+      script &&
+      script.parentNode
+    ) {
+
+      script.parentNode.removeChild(script);
+
+    }
+
+  }, 15000);
+
+}
+
+
+/* =====================================================
+   TAMPILKAN PESAN
+   PESAN PERMANEN SAMPAI SCAN BERIKUTNYA
+   ===================================================== */
+
+function tampilkanPesan(
+  judul,
+  isi
+) {
+
+  document.getElementById("hasil").innerHTML =
+
+    "<b>" +
+    judul +
+    "</b><br><br>" +
+
+    isi.replace(
+      /\n/g,
+      "<br>"
+    );
+
+
+  /*
+   * JANGAN reset otomatis.
+   *
+   * Status akan tetap tampil bersama gambar
+   * sampai barcode berikutnya berhasil terbaca.
+   *
+   * Scanner tetap di-resume setelah hasil diterima.
+   */
+
+  sedangMemproses = false;
+
+  resumeScanner();
+
+}
+
+/* =====================================================
+   JALANKAN KAMERA OTOMATIS
+   ===================================================== */
+
+window.addEventListener(
+
+  "load",
+
+  function() {
+
+    mulaiScanner();
+
+  }
+
+);
+
+</script>
+
+</body>
+
+</html>
